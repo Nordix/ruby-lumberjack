@@ -17,6 +17,8 @@ module Lumberjack
         :ssl_cert => nil,
         :ssl_key => nil,
         :ssl_key_passphrase => nil,
+        :ssl_crl => nil,
+        :ssl_crl_check_all => false,
       }.merge(opts)
 
       @opts[:addresses] = [@opts[:addresses]] if @opts[:addresses].class == String
@@ -66,6 +68,8 @@ module Lumberjack
     #                      will be used.
     # * :ssl_cert - the path to optional client certificate to use to authenticate towards the server.
     # * :ssl_key - the path to optional client key to use to authenticate towards the server.
+    # * :ssl_crl - the path to optional certificate revocation list to use to verify the server certificate.
+    # * :ssl_crl_check_all - if true, the certificate revocation list will be used to verify all certificates in the chain.
     attr_reader :sequence
     attr_reader :host
     def initialize(opts={})
@@ -80,11 +84,16 @@ module Lumberjack
         :ssl_cert => nil,
         :ssl_key => nil,
         :ssl_key_passphrase => nil,
+        :ssl_crl => nil,
+        :ssl_crl_check_all => false,
       }.merge(opts)
       @host = @opts[:address]
 
       connection_start(opts)
     end
+
+    private
+    CRL_END_TAG = "\n-----END X509 CRL-----\n"
 
     private
     def connection_start(opts)
@@ -96,6 +105,15 @@ module Lumberjack
 
         certificate_store = OpenSSL::X509::Store.new
         certificate_store.add_cert(certificate)
+
+        if opts[:ssl_crl]
+          # copy the behavior of X509_load_crl_file() which supports loading bundles of CRLs.
+          File.read(opts[:ssl_crl]).split(CRL_END_TAG).each do |crl|
+            crl << CRL_END_TAG
+            certificate_store.add_crl(OpenSSL::X509::CRL.new(crl))
+          end
+          certificate_store.flags = opts[:ssl_crl_check_all] ? OpenSSL::X509::V_FLAG_CRL_CHECK|OpenSSL::X509::V_FLAG_CRL_CHECK_ALL : OpenSSL::X509::V_FLAG_CRL_CHECK
+        end
 
         ssl_context = OpenSSL::SSL::SSLContext.new
         ssl_context.verify_mode = OpenSSL::SSL::VERIFY_PEER
