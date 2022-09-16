@@ -101,7 +101,7 @@ module Lumberjack
         ssl_context.verify_mode = OpenSSL::SSL::VERIFY_PEER
         ssl_context.cert_store = certificate_store
         ssl_context.cert = OpenSSL::X509::Certificate.new(File.read(opts[:ssl_cert]))
-        ssl_context.key = OpenSSL::PKey::RSA.new(File.read(opts[:ssl_key]),opts[:ssl_key_passphrase])
+        ssl_context.key = OpenSSL::PKey::read(File.read(opts[:ssl_key]),opts[:ssl_key_passphrase])
 
         @socket = OpenSSL::SSL::SSLSocket.new(tcp_socket, ssl_context)
         @socket.connect
