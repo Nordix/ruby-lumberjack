@@ -101,10 +101,12 @@ module Lumberjack
       if !opts[:ssl]
         @socket = tcp_socket
       else
-        certificate = OpenSSL::X509::Certificate.new(File.read(opts[:ssl_certificate]))
-
         certificate_store = OpenSSL::X509::Store.new
-        certificate_store.add_cert(certificate)
+
+        pem_bundle = split_pem_bundle(File.read(opts[:ssl_certificate]))
+        pem_bundle.each do |pem|
+          certificate_store.add_cert(OpenSSL::X509::Certificate.new(pem))
+        end
 
         if opts[:ssl_crl]
           # copy the behavior of X509_load_crl_file() which supports loading bundles of CRLs.
@@ -192,6 +194,18 @@ module Lumberjack
     private
     def read_last_ack
       @socket.read(4).unpack("N").first
+    end
+
+    PEM_DELIMITER = "-----END CERTIFICATE-----\n"
+
+    private
+    def split_pem_bundle(pem_bundle)
+      result = []
+      parts = pem_bundle.split(PEM_DELIMITER)
+      parts.each do |part|
+        result.append(part << PEM_DELIMITER)
+      end
+      result
     end
   end
 
